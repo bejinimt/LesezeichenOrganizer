@@ -35,6 +35,30 @@ fileInput.addEventListener("change", function (event) {
 });
 
 
+
+document.getElementById("btnLoadHtml").addEventListener("click", handleLoadHtml);
+
+function handleLoadHtml() {
+    const input = document.getElementById("fileInputHtml");
+    if (!input) return;
+
+    input.value = ""; // wichtig, damit zweimal dieselbe Datei geht
+    input.click();
+
+    input.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const text = await file.text();
+
+        // 🔥 Hier wird die Funktion aus import-html.js aufgerufen
+        window.parseBookmarkHTMLWithTags(text);
+    };
+}
+
+
+
+
 // ---------------------------------------------------------
 // Suche
 // ---------------------------------------------------------

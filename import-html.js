@@ -1,117 +1,152 @@
-// ------------------------------------------------------------
-// import-html.js (zeilenbasierte Version wie parser-html.js)
-// Erkennt Tags im Format [[TAGS: ...]]
-// ------------------------------------------------------------
+window.parseBookmarkHTMLWithTags = function (htmlText) {
+    try {
+        const lines = htmlText.split(/\r?\n/);
 
-document.addEventListener("DOMContentLoaded", () => {
+        window.bookmarkData = { folders: [] };
 
-    const fileInput = document.getElementById("fileInputHtml");
-    const btnLoadHtml = document.getElementById("btnLoadHtml");
-
-    if (!btnLoadHtml || !fileInput) return;
-
-    btnLoadHtml.addEventListener("click", () => fileInput.click());
-
-    fileInput.addEventListener("change", async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-
-        const text = await file.text();
-        const lines = text.split(/\r?\n/);
-
-        const folders = [];
-        let folderIdCounter = 1;
-        let absCounter = 1;
-
-        const stack = [];
+        let folderCounter = 0;
+        const folderStack = [];
+        const numberStack = [];
+        const localCounters = {};
 
         function createFolder(title) {
-            return {
-                id: folderIdCounter++,
-                title,
+            folderCounter++;
+            const folder = {
+                id: folderCounter,
+                title: title || "(Ohne Titel)",
                 children: [],
-                visible: true,
+                absoluteNumber: null,
+
+                // Checkbox-Eigenschaften
+                showCheckbox: false,
                 selected: false,
-                showCheckbox: false
+
+                // Sichtbarkeit
+                visible: true
             };
+            window.bookmarkData.folders.push(folder);
+            localCounters[folder.id] = { folderCount: 0, linkCount: 0 };
+            return folder;
         }
 
-        // Root-Ordner
-        const root = createFolder("ROOT");
-        folders.push(root);
-        stack.push(root);
+        function extractH3Title(line) {
+            const upper = line.toUpperCase();
+            const start = upper.indexOf("<H3");
+            if (start === -1) return null;
+            const gt = line.indexOf(">", start);
+            const end = upper.indexOf("</H3>", gt);
+            return line.substring(gt + 1, end).trim();
+        }
+
+        function extractHref(line) {
+            const match = line.match(/HREF="([^"]*)"/i);
+            return match ? match[1] : "";
+        }
+
+        function extractATitle(line) {
+            const upper = line.toUpperCase();
+            const start = upper.indexOf("<A");
+            if (start === -1) return null;
+            const gt = line.indexOf(">", start);
+            const end = upper.indexOf("</A>", gt);
+            return line.substring(gt + 1, end).trim();
+        }
 
         for (let rawLine of lines) {
             const line = rawLine.trim();
+            if (!line) continue;
 
-            // Ordner öffnen
-            if (line.startsWith("<H3")) {
-                const title = line.replace(/.*<H3[^>]*>(.*?)<\/H3>.*/, "$1").trim();
-                const folder = createFolder(title);
+            const upper = line.toUpperCase();
 
-                // Elternordner bekommt Verweis
-                const parent = stack[stack.length - 1];
-                parent.children.push({
-                    type: "folder",
-                    ref: folder.id
-                });
+            // ------------------------------------------------------------
+            if (upper.includes("<DT><H3") || upper.includes("<H3")) {
+                const title = extractH3Title(line) || "(Ohne Titel)";
+                const newFolder = createFolder(title);
 
-                folders.push(folder);
+                if (folderStack.length > 0) {
+                    const parentId = folderStack[folderStack.length - 1];
+                    const parentFolder = window.bookmarkData.folders.find(f => f.id === parentId);
+
+                    parentFolder.children.push({
+                        type: "folder",
+                        ref: newFolder.id
+                    });
+
+                    localCounters[parentId].folderCount++;
+
+                    const parentNum = numberStack[numberStack.length - 1];
+                    const num = parentNum
+                        ? parentNum + "." + localCounters[parentId].folderCount
+                        : "" + localCounters[parentId].folderCount;
+
+                    newFolder.absoluteNumber = num;
+                    numberStack.push(num);
+                } else {
+                    newFolder.absoluteNumber = null;
+                    numberStack.push("");
+                }
+
+                folderStack.push(newFolder.id);
                 continue;
             }
 
-            // <DL> → neuer Ordner beginnt
-            if (line.startsWith("<DL")) {
-                const lastFolder = folders[folders.length - 1];
-                stack.push(lastFolder);
-                continue;
-            }
+            // BOOKMARK
+            if (upper.includes("<DT><A") || upper.includes("<A ")) {
 
-            // </DL> → Ordner endet
-            if (line.startsWith("</DL")) {
-                stack.pop();
-                continue;
-            }
-
-            // Bookmark
-            if (line.startsWith("<DT><A")) {
-                const url = line.replace(/.*HREF="(.*?)".*/, "$1");
-
-                let title = line.replace(/.*>(.*?)<\/A>.*/, "$1").trim();
-                let tags = [];
+                const href = extractHref(line);
+                let title = extractATitle(line);
+                if (!title) title = href || "(Ohne Titel)";
 
                 // Tags extrahieren: [[TAGS: ...]]
+                let tags = [];
                 const tagMatch = title.match(/^(.*)\s*\[\[TAGS:(.*?)\]\]$/);
                 if (tagMatch) {
                     title = tagMatch[1].trim();
                     tags = tagMatch[2].split(",").map(t => t.trim());
                 }
 
-                const parent = stack[stack.length - 1];
-                parent.children.push({
+                const currentFolderId = folderStack[folderStack.length - 1];
+                const currentFolder = window.bookmarkData.folders.find(f => f.id === currentFolderId);
+
+                localCounters[currentFolderId].linkCount++;
+
+                const base = numberStack[numberStack.length - 1];
+                const absNum = base
+                    ? base + "." + localCounters[currentFolderId].linkCount
+                    : "" + localCounters[currentFolderId].linkCount;
+
+                currentFolder.children.push({
                     type: "bookmark",
-                    title,
-                    url,
-                    tags,
-                    visible: true,
-                    selected: false,
+                    title: title,
+                    url: href,
+                    absoluteNumber: absNum,
+                    tags: tags.length ? tags : [currentFolder.title],
+
                     showCheckbox: false,
-                    absoluteNumber: (absCounter++).toString()
+                    selected: false,
+                    visible: true
                 });
 
                 continue;
             }
+
+            // ------------------------------------------------------------
+            // ORDNER SCHLIESSEN
+            // ------------------------------------------------------------
+            if (upper.includes("</DL>")) {
+                if (folderStack.length > 1) { // Root im Stack lassen
+                    folderStack.pop();
+                    numberStack.pop();
+                }
+                continue;
+            }
         }
 
-        // Globale Datenstruktur setzen
-        window.bookmarkData = { folders };
-
-        // Index neu aufbauen
-        window.buildBookmarkIndex();
-
-        // Rendern
+        window.setMessage("Lesezeichen erfolgreich geladen.");
         window.renderTree();
 
-        window.setMessage("HTML erfolgreich importiert.");
-    });
-});
+    } catch (err) {
+        console.error(err);
+        window.setMessage("Fehler beim Verarbeiten der HTML‑Datei.");
+    }
+};
