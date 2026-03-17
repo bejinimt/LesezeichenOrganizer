@@ -1,6 +1,7 @@
 // ============================================================
 // Lesezeichen‑Organizer – Parsing, absolute Nummerierung,
-// Suche, Duplikate (mit Fundstellen), globale URL‑Anzeige
+// Suche, Duplikate (mit Fundstellen), globale URL‑Anzeige,
+// anklickbare Fundstellen
 // ============================================================
 
 
@@ -12,7 +13,7 @@ let bookmarkData = { folders: [] };
 let showNumbers = false;
 let showAllUrls = false;
 let showDuplicatesOnly = false;
-let showDuplicateLocations = false;   // <-- NEU
+let showDuplicateLocations = false;   // Toggle für Fundstellen
 let currentSearchTerm = "";
 
 
@@ -24,7 +25,7 @@ const btnLoad = document.getElementById("btnLoad");
 const btnToggleNumbers = document.getElementById("btnToggleNumbers");
 const btnToggleAllUrls = document.getElementById("btnToggleAllUrls");
 const btnShowDuplicates = document.getElementById("btnShowDuplicates");
-const btnToggleLocations = document.getElementById("btnToggleLocations"); // <-- NEU
+const btnToggleLocations = document.getElementById("btnToggleLocations");
 const btnExport = document.getElementById("btnExport");
 const fileInput = document.getElementById("fileInput");
 const messageArea = document.getElementById("messageArea");
@@ -373,6 +374,9 @@ function renderFolderNode(folder) {
             const liB = document.createElement("li");
             liB.className = "bookmark-item";
 
+            // DOM‑ID für Sprunganker
+            liB.id = "link-" + child.absoluteNumber.replace(/\./g, "-");
+
             const dupNums = duplicates.get(child.url);
             let visible = true;
 
@@ -412,12 +416,39 @@ function renderFolderNode(folder) {
 
             liB.appendChild(link);
 
-            // --- Fundstellen hinter dem Link (B1‑b) ---
+            // --- Fundstellen hinter dem Link (anklickbar) ---
             if (dupNums && showDuplicateLocations) {
                 const info = document.createElement("span");
                 info.style.color = "#b00";
                 info.style.marginLeft = "8px";
-                info.textContent = "(Fundstellen: " + dupNums.join(", ") + ")";
+                info.textContent = "(Fundstellen: ";
+
+                dupNums.forEach((num, index) => {
+                    const a = document.createElement("a");
+                    const id = "link-" + num.replace(/\./g, "-");
+
+                    a.href = "#" + id;
+                    a.textContent = num;
+                    a.style.color = "#b00";
+                    a.style.textDecoration = "underline";
+
+                    // Highlight beim Ziel
+                    a.addEventListener("click", () => {
+                        const target = document.getElementById(id);
+                        if (target) {
+                            target.classList.add("jump-highlight");
+                            setTimeout(() => target.classList.remove("jump-highlight"), 1500);
+                        }
+                    });
+
+                    info.appendChild(a);
+
+                    if (index < dupNums.length - 1) {
+                        info.appendChild(document.createTextNode(", "));
+                    }
+                });
+
+                info.appendChild(document.createTextNode(")"));
                 liB.appendChild(info);
             }
 
@@ -472,7 +503,7 @@ btnShowDuplicates.addEventListener("click", () => {
     renderTree();
 });
 
-// --- NEU: Fundstellen‑Toggle ---
+// --- Fundstellen‑Toggle ---
 btnToggleLocations.addEventListener("click", () => {
     showDuplicateLocations = !showDuplicateLocations;
     btnToggleLocations.textContent = showDuplicateLocations
