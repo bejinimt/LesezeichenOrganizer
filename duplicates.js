@@ -47,6 +47,34 @@ window.getDuplicateInfo = function () {
     }
 
     // --------------------------------------------------------
+// Checkbox-Logik für Duplikate
+// --------------------------------------------------------
+for (const [url, nums] of map.entries()) {
+
+    // nums = absoluteNumbers der Bookmarks
+    if (nums.length > 1) {
+
+        // Erstes Bookmark: Checkbox sichtbar, aber NICHT angehakt
+        const first = window.bookmarkIndex[nums[0]];
+        if (first) {
+            first.showCheckbox = true;
+            first.selected = false;
+        }
+
+        // Alle weiteren: Checkbox sichtbar UND angehakt
+        for (let i = 1; i < nums.length; i++) {
+            const bm = window.bookmarkIndex[nums[i]];
+            if (bm) {
+                bm.showCheckbox = true;
+                bm.selected = true;
+            }
+        }
+    }
+}
+
+
+
+    // --------------------------------------------------------
     // Tags aller Duplikate zusammenführen
     // --------------------------------------------------------
 
