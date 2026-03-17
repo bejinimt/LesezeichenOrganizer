@@ -1,7 +1,7 @@
 // ============================================================
 // Lesezeichen‑Organizer – Parsing, absolute Nummerierung,
-// Suche, Duplikate (mit Fundstellen), globale URL‑Anzeige,
-// anklickbare Fundstellen
+// Suche, Duplikate (mit Fundstellen), Tags (Ordnername),
+// globale URL‑Anzeige, anklickbare Fundstellen
 // ============================================================
 
 
@@ -13,7 +13,7 @@ let bookmarkData = { folders: [] };
 let showNumbers = false;
 let showAllUrls = false;
 let showDuplicatesOnly = false;
-let showDuplicateLocations = false;   // Toggle für Fundstellen
+let showDuplicateLocations = false;
 let currentSearchTerm = "";
 
 
@@ -75,7 +75,7 @@ function handleFileSelect(event) {
 
 
 // ============================================================
-// PARSING MIT ABSOLUTER NUMMERIERUNG
+// PARSING MIT ABSOLUTER NUMMERIERUNG + TAGS
 // ============================================================
 
 function parseBookmarkHTML(htmlText) {
@@ -186,11 +186,13 @@ function parseBookmarkHTML(htmlText) {
                     ? base + "." + localCounters[currentFolderId].linkCount
                     : "" + localCounters[currentFolderId].linkCount;
 
+                // --- TAGS: Ordnername als Schlagwort ---
                 currentFolder.children.push({
                     type: "bookmark",
                     title: title,
                     url: href,
-                    absoluteNumber: absNum
+                    absoluteNumber: absNum,
+                    tags: [currentFolder.title]
                 });
 
                 continue;
@@ -241,7 +243,7 @@ function parseBookmarkJSON(jsonText) {
 
 
 // ============================================================
-// DUPLIKATE MIT FUNDSTELLEN (Map statt Set)
+// DUPLIKATE MIT FUNDSTELLEN
 // ============================================================
 
 function getDuplicateInfo() {
@@ -293,7 +295,8 @@ function matchesSearch(bookmark) {
     const term = currentSearchTerm.toLowerCase();
     return (
         (bookmark.title || "").toLowerCase().includes(term) ||
-        (bookmark.url || "").toLowerCase().includes(term)
+        (bookmark.url || "").toLowerCase().includes(term) ||
+        (bookmark.tags || []).some(t => t.toLowerCase().includes(term))
     );
 }
 
@@ -432,7 +435,6 @@ function renderFolderNode(folder) {
                     a.style.color = "#b00";
                     a.style.textDecoration = "underline";
 
-                    // Highlight beim Ziel
                     a.addEventListener("click", () => {
                         const target = document.getElementById(id);
                         if (target) {
@@ -450,6 +452,16 @@ function renderFolderNode(folder) {
 
                 info.appendChild(document.createTextNode(")"));
                 liB.appendChild(info);
+            }
+
+            // --- Tags anzeigen (T2) ---
+            if (child.tags && child.tags.length > 0) {
+                const tagDiv = document.createElement("div");
+                tagDiv.textContent = "Tags: " + child.tags.join(", ");
+                tagDiv.style.marginLeft = "20px";
+                tagDiv.style.fontSize = "0.9em";
+                tagDiv.style.color = "#006";
+                liB.appendChild(tagDiv);
             }
 
             const urlDiv = document.createElement("div");
@@ -503,7 +515,6 @@ btnShowDuplicates.addEventListener("click", () => {
     renderTree();
 });
 
-// --- Fundstellen‑Toggle ---
 btnToggleLocations.addEventListener("click", () => {
     showDuplicateLocations = !showDuplicateLocations;
     btnToggleLocations.textContent = showDuplicateLocations
