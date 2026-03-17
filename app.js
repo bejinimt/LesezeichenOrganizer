@@ -1,6 +1,6 @@
 // ============================================================
-// Lesezeichen‑Organizer – Parsing, Nummerierung, Suche,
-// globale URL‑Anzeige + DUPLIKAT-ANZEIGE
+// Lesezeichen‑Organizer – Parsing, absolute Nummerierung,
+// Suche, Duplikate, globale URL‑Anzeige
 // ============================================================
 
 
@@ -11,7 +11,7 @@
 let bookmarkData = { folders: [] };
 let showNumbers = false;
 let showAllUrls = false;
-let showDuplicatesOnly = false;   // <--- NEU
+let showDuplicatesOnly = false;
 let currentSearchTerm = "";
 
 
@@ -22,7 +22,7 @@ let currentSearchTerm = "";
 const btnLoad = document.getElementById("btnLoad");
 const btnToggleNumbers = document.getElementById("btnToggleNumbers");
 const btnToggleAllUrls = document.getElementById("btnToggleAllUrls");
-const btnShowDuplicates = document.getElementById("btnShowDuplicates"); // <--- NEU
+const btnShowDuplicates = document.getElementById("btnShowDuplicates");
 const btnExport = document.getElementById("btnExport");
 const fileInput = document.getElementById("fileInput");
 const messageArea = document.getElementById("messageArea");
@@ -71,9 +71,9 @@ function handleFileSelect(event) {
 }
 
 
-// -----------------------------
-// Parsing: HTML‑Export – ZEILENWEISE
-// -----------------------------
+// ============================================================
+// PARSING MIT ABSOLUTER NUMMERIERUNG (A1 + O1‑A + F1 + R1)
+// ============================================================
 
 function parseBookmarkHTML(htmlText) {
     try {
@@ -83,17 +83,19 @@ function parseBookmarkHTML(htmlText) {
 
         let folderCounter = 0;
         const folderStack = [];
-        const bookmarkIndexMap = {};
+        const numberStack = []; // absolute Nummern
+        const localCounters = {}; // pro Ordner: { folderCount, linkCount }
 
         function createFolder(title) {
             folderCounter++;
             const folder = {
                 id: folderCounter,
                 title: title || "(Ohne Titel)",
-                children: []
+                children: [],
+                absoluteNumber: null
             };
             bookmarkData.folders.push(folder);
-            bookmarkIndexMap[folder.id] = 0;
+            localCounters[folder.id] = { folderCount: 0, linkCount: 0 };
             return folder;
         }
 
@@ -101,7 +103,6 @@ function parseBookmarkHTML(htmlText) {
             const upper = line.toUpperCase();
             const start = upper.indexOf("<H3");
             if (start === -1) return null;
-
             const gt = line.indexOf(">", start);
             const end = upper.indexOf("</H3>", gt);
             return line.substring(gt + 1, end).trim();
@@ -116,13 +117,14 @@ function parseBookmarkHTML(htmlText) {
             const upper = line.toUpperCase();
             const start = upper.indexOf("<A");
             if (start === -1) return null;
-
             const gt = line.indexOf(">", start);
             const end = upper.indexOf("</A>", gt);
             return line.substring(gt + 1, end).trim();
         }
 
-        // --- Hauptschleife: Zeile für Zeile ---
+        // -----------------------------
+        // Hauptschleife
+        // -----------------------------
         for (let rawLine of lines) {
             const line = rawLine.trim();
             if (!line) continue;
@@ -134,13 +136,30 @@ function parseBookmarkHTML(htmlText) {
                 const title = extractH3Title(line) || "(Ohne Titel)";
                 const newFolder = createFolder(title);
 
+                // Elternordner vorhanden?
                 if (folderStack.length > 0) {
                     const parentId = folderStack[folderStack.length - 1];
                     const parentFolder = bookmarkData.folders.find(f => f.id === parentId);
+
                     parentFolder.children.push({
                         type: "folder",
                         ref: newFolder.id
                     });
+
+                    // Zähler erhöhen
+                    localCounters[parentId].folderCount++;
+
+                    const parentNum = numberStack[numberStack.length - 1];
+                    const num = parentNum
+                        ? parentNum + "." + localCounters[parentId].folderCount
+                        : "" + localCounters[parentId].folderCount;
+
+                    newFolder.absoluteNumber = num;
+                    numberStack.push(num);
+                } else {
+                    // Wurzel bekommt KEINE Nummer (R1)
+                    newFolder.absoluteNumber = null;
+                    numberStack.push(""); // Platzhalter
                 }
 
                 folderStack.push(newFolder.id);
@@ -151,7 +170,9 @@ function parseBookmarkHTML(htmlText) {
             if (upper.includes("<DT><A") || upper.includes("<A ")) {
                 if (folderStack.length === 0) {
                     const autoFolder = createFolder("Allgemein");
+                    autoFolder.absoluteNumber = null;
                     folderStack.push(autoFolder.id);
+                    numberStack.push("");
                 }
 
                 const href = extractHref(line);
@@ -161,14 +182,18 @@ function parseBookmarkHTML(htmlText) {
                 const currentFolderId = folderStack[folderStack.length - 1];
                 const currentFolder = bookmarkData.folders.find(f => f.id === currentFolderId);
 
-                bookmarkIndexMap[currentFolderId]++;
-                const index = bookmarkIndexMap[currentFolderId];
+                localCounters[currentFolderId].linkCount++;
+
+                const base = numberStack[numberStack.length - 1];
+                const absNum = base
+                    ? base + "." + localCounters[currentFolderId].linkCount
+                    : "" + localCounters[currentFolderId].linkCount;
 
                 currentFolder.children.push({
                     type: "bookmark",
-                    index: index,
                     title: title,
-                    url: href
+                    url: href,
+                    absoluteNumber: absNum
                 });
 
                 continue;
@@ -178,6 +203,7 @@ function parseBookmarkHTML(htmlText) {
             if (upper.includes("</DL>")) {
                 if (folderStack.length > 0) {
                     folderStack.pop();
+                    numberStack.pop();
                 }
                 continue;
             }
@@ -193,9 +219,9 @@ function parseBookmarkHTML(htmlText) {
 }
 
 
-// -----------------------------
-// Parsing: JSON‑Export
-// -----------------------------
+// ============================================================
+// JSON‑Parsing (Nummern werden NICHT exportiert → E2)
+// ============================================================
 
 function parseBookmarkJSON(jsonText) {
     try {
@@ -217,9 +243,9 @@ function parseBookmarkJSON(jsonText) {
 }
 
 
-// -----------------------------
+// ============================================================
 // DUPLIKATE FINDEN
-// -----------------------------
+// ============================================================
 
 function getDuplicateUrls() {
     const urlCount = {};
@@ -239,33 +265,21 @@ function getDuplicateUrls() {
 
     walk(bookmarkData.folders[0]);
 
-    const duplicates = new Set(
-        Object.keys(urlCount).filter(url => urlCount[url] > 1)
-    );
-
-    return duplicates;
+    return new Set(Object.keys(urlCount).filter(url => urlCount[url] > 1));
 }
 
 
-// -----------------------------
-// Suche in Ordnern
-// -----------------------------
+// ============================================================
+// SUCHE
+// ============================================================
 
 function matchesFolder(folder) {
     if (!currentSearchTerm) return true;
-
-    const term = currentSearchTerm.toLowerCase();
-    return (folder.title || "").toLowerCase().includes(term);
+    return (folder.title || "").toLowerCase().includes(currentSearchTerm.toLowerCase());
 }
-
-
-// -----------------------------
-// Suche in Lesezeichen
-// -----------------------------
 
 function matchesSearch(bookmark) {
     if (!currentSearchTerm) return true;
-
     const term = currentSearchTerm.toLowerCase();
     return (
         (bookmark.title || "").toLowerCase().includes(term) ||
@@ -274,9 +288,9 @@ function matchesSearch(bookmark) {
 }
 
 
-// -----------------------------
-// Baumdarstellung
-// -----------------------------
+// ============================================================
+// BAUMDARSTELLUNG
+// ============================================================
 
 function renderTree() {
     treeContainer.innerHTML = "";
@@ -291,7 +305,7 @@ function renderTree() {
     const ul = document.createElement("ul");
     ul.className = "bookmark-tree";
 
-    const rootLi = renderFolderNode(rootFolder, "1");
+    const rootLi = renderFolderNode(rootFolder);
 
     if (rootLi) {
         ul.appendChild(rootLi);
@@ -303,22 +317,21 @@ function renderTree() {
 }
 
 
-/**
- * Rendert einen Ordner rekursiv.
- */
-function renderFolderNode(folder, numberPrefix) {
-    const folderMatches = matchesFolder(folder);
+function renderFolderNode(folder) {
     const duplicates = getDuplicateUrls();
+    const folderMatches = matchesFolder(folder);
+
+    let hasVisibleChildren = false;
 
     const li = document.createElement("li");
 
     const label = document.createElement("span");
     label.className = "folder-label";
 
-    if (showNumbers) {
+    if (showNumbers && folder.absoluteNumber) {
         const num = document.createElement("span");
         num.className = "entry-number";
-        num.textContent = numberPrefix + " ";
+        num.textContent = folder.absoluteNumber + " ";
         label.appendChild(num);
     }
 
@@ -332,48 +345,45 @@ function renderFolderNode(folder, numberPrefix) {
     const ul = document.createElement("ul");
     ul.className = "bookmark-tree";
 
-    let hasVisibleChildren = false;
-    let folderChildCounter = 0;
-    let bookmarkCounter = 0;
-
     for (const child of folder.children) {
 
         // --- Unterordner ---
         if (child.type === "folder") {
             const subFolder = bookmarkData.folders.find(f => f.id === child.ref);
-            if (subFolder) {
-                folderChildCounter++;
+            const subLi = renderFolderNode(subFolder);
 
-                const newPrefix = numberPrefix + "." + folderChildCounter;
-
-                const subLi = renderFolderNode(subFolder, newPrefix);
-                if (subLi) {
-                    ul.appendChild(subLi);
-                    hasVisibleChildren = true;
-                }
+            if (subLi) {
+                ul.appendChild(subLi);
+                hasVisibleChildren = true;
             }
         }
 
         // --- Lesezeichen ---
         else if (child.type === "bookmark") {
 
-            // Filter: nur Duplikate anzeigen?
-            if (showDuplicatesOnly && !duplicates.has(child.url)) {
-                continue;
-            }
-
-            // Filter: Suchbegriff
-            if (currentSearchTerm && !matchesSearch(child)) continue;
-
-            bookmarkCounter++;
-
             const liB = document.createElement("li");
             liB.className = "bookmark-item";
+
+            let visible = true;
+
+            if (showDuplicatesOnly && !duplicates.has(child.url)) {
+                visible = false;
+            }
+
+            if (currentSearchTerm && !matchesSearch(child)) {
+                visible = false;
+            }
+
+            if (!visible) {
+                liB.style.display = "none";
+            } else {
+                hasVisibleChildren = true;
+            }
 
             if (showNumbers) {
                 const num = document.createElement("span");
                 num.className = "entry-number";
-                num.textContent = numberPrefix + "." + bookmarkCounter + " ";
+                num.textContent = child.absoluteNumber + " ";
                 liB.appendChild(num);
             }
 
@@ -388,7 +398,6 @@ function renderFolderNode(folder, numberPrefix) {
 
             liB.appendChild(link);
 
-            // URL‑Anzeige (global)
             const urlDiv = document.createElement("div");
             urlDiv.textContent = child.url;
             urlDiv.style.marginLeft = "20px";
@@ -399,11 +408,14 @@ function renderFolderNode(folder, numberPrefix) {
             liB.appendChild(urlDiv);
 
             ul.appendChild(liB);
-            hasVisibleChildren = true;
         }
     }
 
-    if (currentSearchTerm && !hasVisibleChildren && !folderMatches) {
+    // Ordner ausblenden, wenn:
+    // - Duplikate aktiv sind
+    // - und der Ordner selbst kein Treffer ist
+    // - und er keine sichtbaren Kinder hat
+    if (showDuplicatesOnly && !hasVisibleChildren) {
         return null;
     }
 
@@ -412,19 +424,14 @@ function renderFolderNode(folder, numberPrefix) {
 }
 
 
-// -----------------------------
-// Sucheingabe
-// -----------------------------
+// ============================================================
+// EVENTS
+// ============================================================
 
 searchInput.addEventListener("input", () => {
     currentSearchTerm = searchInput.value.trim();
     renderTree();
 });
-
-
-// -----------------------------
-// Nummern ein-/ausblenden
-// -----------------------------
 
 btnToggleNumbers.addEventListener("click", () => {
     showNumbers = !showNumbers;
@@ -432,35 +439,19 @@ btnToggleNumbers.addEventListener("click", () => {
     renderTree();
 });
 
-
-// -----------------------------
-// ALLE URLs ein-/ausblenden
-// -----------------------------
-
 btnToggleAllUrls.addEventListener("click", () => {
     showAllUrls = !showAllUrls;
     btnToggleAllUrls.textContent = showAllUrls ? "Alle URLs ausblenden" : "Alle URLs anzeigen";
     renderTree();
 });
 
-
-// -----------------------------
-// DUPLIKATE anzeigen
-// -----------------------------
-
 btnShowDuplicates.addEventListener("click", () => {
     showDuplicatesOnly = !showDuplicatesOnly;
     btnShowDuplicates.textContent = showDuplicatesOnly
         ? "Alle anzeigen"
         : "Doppelte Links anzeigen";
-
     renderTree();
 });
-
-
-// -----------------------------
-// Export
-// -----------------------------
 
 btnExport.addEventListener("click", () => {
     if (!bookmarkData.folders.length) {
@@ -469,12 +460,8 @@ btnExport.addEventListener("click", () => {
     }
 
     const json = JSON.stringify(bookmarkData, null, 2);
-
     const now = new Date();
-    const fileName =
-        "Lesezeichen_" +
-        now.toISOString().replace(/[:.]/g, "-") +
-        ".json";
+    const fileName = "Lesezeichen_" + now.toISOString().replace(/[:.]/g, "-") + ".json";
 
     const blob = new Blob([json], { type: "application/json" });
     const url = URL.createObjectURL(blob);
