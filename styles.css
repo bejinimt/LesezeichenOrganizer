@@ -1,0 +1,96 @@
+/* Allgemeine Seitengestaltung – bewusst schlicht gehalten,
+   damit das Design später leicht angepasst werden kann. */
+
+body {
+    margin: 0;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background-color: #f5f5f5;
+    color: #222;
+}
+
+/* Menüleiste oben */
+#toolbar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background-color: #2f3b52;
+    color: #fff;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+#toolbar button {
+    padding: 0.3rem 0.7rem;
+    border: none;
+    border-radius: 4px;
+    background-color: #4a90e2;
+    color: #fff;
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+
+#toolbar button:hover {
+    background-color: #357ab8;
+}
+
+#toolbar label {
+    margin-left: auto; /* schiebt das Suchfeld nach rechts */
+    font-size: 0.9rem;
+}
+
+#toolbar input[type="text"] {
+    padding: 0.3rem 0.5rem;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+    min-width: 200px;
+}
+
+/* Meldungsbereich */
+#messageArea {
+    padding: 0.5rem 1rem;
+    min-height: 1.5rem;
+    font-size: 0.9rem;
+    background-color: #eef3ff;
+    border-bottom: 1px solid #d0d7e2;
+}
+
+/* Container für die Baumdarstellung */
+#treeContainer {
+    padding: 1rem;
+}
+
+/* Baumstruktur: wir verwenden eine verschachtelte Liste */
+.bookmark-tree {
+    list-style-type: none; /* Standard-Aufzählungszeichen entfernen */
+    padding-left: 1rem;
+}
+
+/* Ordner-Einträge */
+.folder-label {
+    font-weight: bold;
+    cursor: pointer;
+}
+
+/* Lesezeichen-Einträge */
+.bookmark-item {
+    cursor: default;
+}
+
+/* Nummerierung vor den Einträgen */
+.entry-number {
+    color: #888;
+    margin-right: 0.3rem;
+    font-size: 0.85em;
+}
+
+/* Gefundene Einträge bei Suche leicht hervorheben */
+.highlight {
+    background-color: #fff9c4;
+}
+
+/* Kleinere Anpassung für verschachtelte Listen */
+.bookmark-tree li {
+    margin: 0.1rem 0;
+}

@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>Lesezeichen-Organizer</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Oberer Bereich: Menüleiste mit Buttons und Suchfeld -->
+    <header id="toolbar">
+        <!-- Button zum Laden einer Lesezeichen-Datei (Edge/Chromium-Export als HTML) -->
+        <button id="btnLoad">Lesezeichen laden</button>
+
+        <!-- Button zum Ein-/Ausblenden der Nummerierung -->
+        <button id="btnToggleNumbers">Nummern anzeigen</button>
+
+        <!-- Button zum Exportieren/Speichern der aktuellen Lesezeichenstruktur -->
+        <button id="btnExport">Liste exportieren</button>
+
+        <!-- Suchfeld: filtert die angezeigten Lesezeichen in Echtzeit -->
+        <label for="searchInput">Suche:</label>
+        <input type="text" id="searchInput" placeholder="Titel oder URL suchen...">
+
+        <!-- Verstecktes Datei-Eingabefeld, wird über den 'Lesezeichen laden'-Button ausgelöst -->
+        <input type="file" id="fileInput" accept=".html,.htm,.json" style="display:none;">
+    </header>
+
+    <!-- Bereich für Meldungen (Status, Hinweise, Fehler) -->
+    <section id="messageArea"></section>
+
+    <!-- Bereich für die Baumdarstellung der Lesezeichen -->
+    <main id="treeContainer"></main>
+
+    <script src="app.js"></script>
+</body>
+</html>
