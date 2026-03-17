@@ -1,6 +1,6 @@
 // ============================================================
 // Lesezeichen‑Organizer – Parsing, absolute Nummerierung,
-// Suche, Duplikate, globale URL‑Anzeige
+// Suche, Duplikate (mit Fundstellen), globale URL‑Anzeige
 // ============================================================
 
 
@@ -12,6 +12,7 @@ let bookmarkData = { folders: [] };
 let showNumbers = false;
 let showAllUrls = false;
 let showDuplicatesOnly = false;
+let showDuplicateLocations = false;   // <-- NEU
 let currentSearchTerm = "";
 
 
@@ -23,6 +24,7 @@ const btnLoad = document.getElementById("btnLoad");
 const btnToggleNumbers = document.getElementById("btnToggleNumbers");
 const btnToggleAllUrls = document.getElementById("btnToggleAllUrls");
 const btnShowDuplicates = document.getElementById("btnShowDuplicates");
+const btnToggleLocations = document.getElementById("btnToggleLocations"); // <-- NEU
 const btnExport = document.getElementById("btnExport");
 const fileInput = document.getElementById("fileInput");
 const messageArea = document.getElementById("messageArea");
@@ -72,7 +74,7 @@ function handleFileSelect(event) {
 
 
 // ============================================================
-// PARSING MIT ABSOLUTER NUMMERIERUNG (A1 + O1‑A + F1 + R1)
+// PARSING MIT ABSOLUTER NUMMERIERUNG
 // ============================================================
 
 function parseBookmarkHTML(htmlText) {
@@ -83,8 +85,8 @@ function parseBookmarkHTML(htmlText) {
 
         let folderCounter = 0;
         const folderStack = [];
-        const numberStack = []; // absolute Nummern
-        const localCounters = {}; // pro Ordner: { folderCount, linkCount }
+        const numberStack = [];
+        const localCounters = {};
 
         function createFolder(title) {
             folderCounter++;
@@ -122,9 +124,6 @@ function parseBookmarkHTML(htmlText) {
             return line.substring(gt + 1, end).trim();
         }
 
-        // -----------------------------
-        // Hauptschleife
-        // -----------------------------
         for (let rawLine of lines) {
             const line = rawLine.trim();
             if (!line) continue;
@@ -136,7 +135,6 @@ function parseBookmarkHTML(htmlText) {
                 const title = extractH3Title(line) || "(Ohne Titel)";
                 const newFolder = createFolder(title);
 
-                // Elternordner vorhanden?
                 if (folderStack.length > 0) {
                     const parentId = folderStack[folderStack.length - 1];
                     const parentFolder = bookmarkData.folders.find(f => f.id === parentId);
@@ -146,7 +144,6 @@ function parseBookmarkHTML(htmlText) {
                         ref: newFolder.id
                     });
 
-                    // Zähler erhöhen
                     localCounters[parentId].folderCount++;
 
                     const parentNum = numberStack[numberStack.length - 1];
@@ -157,9 +154,8 @@ function parseBookmarkHTML(htmlText) {
                     newFolder.absoluteNumber = num;
                     numberStack.push(num);
                 } else {
-                    // Wurzel bekommt KEINE Nummer (R1)
                     newFolder.absoluteNumber = null;
-                    numberStack.push(""); // Platzhalter
+                    numberStack.push("");
                 }
 
                 folderStack.push(newFolder.id);
@@ -220,7 +216,7 @@ function parseBookmarkHTML(htmlText) {
 
 
 // ============================================================
-// JSON‑Parsing (Nummern werden NICHT exportiert → E2)
+// JSON‑Parsing
 // ============================================================
 
 function parseBookmarkJSON(jsonText) {
@@ -244,18 +240,25 @@ function parseBookmarkJSON(jsonText) {
 
 
 // ============================================================
-// DUPLIKATE FINDEN
+// DUPLIKATE MIT FUNDSTELLEN (Map statt Set)
 // ============================================================
 
-function getDuplicateUrls() {
-    const urlCount = {};
+function getDuplicateInfo() {
+    const map = new Map();
 
     function walk(folder) {
         for (const child of folder.children) {
+
             if (child.type === "bookmark") {
                 const url = child.url.trim();
-                urlCount[url] = (urlCount[url] || 0) + 1;
+                const num = child.absoluteNumber;
+
+                if (!map.has(url)) {
+                    map.set(url, []);
+                }
+                map.get(url).push(num);
             }
+
             if (child.type === "folder") {
                 const sub = bookmarkData.folders.find(f => f.id === child.ref);
                 if (sub) walk(sub);
@@ -265,7 +268,13 @@ function getDuplicateUrls() {
 
     walk(bookmarkData.folders[0]);
 
-    return new Set(Object.keys(urlCount).filter(url => urlCount[url] > 1));
+    for (const [url, nums] of map.entries()) {
+        if (nums.length < 2) {
+            map.delete(url);
+        }
+    }
+
+    return map;
 }
 
 
@@ -318,7 +327,7 @@ function renderTree() {
 
 
 function renderFolderNode(folder) {
-    const duplicates = getDuplicateUrls();
+    const duplicates = getDuplicateInfo();
     const folderMatches = matchesFolder(folder);
 
     let hasVisibleChildren = false;
@@ -364,9 +373,10 @@ function renderFolderNode(folder) {
             const liB = document.createElement("li");
             liB.className = "bookmark-item";
 
+            const dupNums = duplicates.get(child.url);
             let visible = true;
 
-            if (showDuplicatesOnly && !duplicates.has(child.url)) {
+            if (showDuplicatesOnly && !dupNums) {
                 visible = false;
             }
 
@@ -378,6 +388,10 @@ function renderFolderNode(folder) {
                 liB.style.display = "none";
             } else {
                 hasVisibleChildren = true;
+            }
+
+            if (dupNums) {
+                liB.classList.add("duplicate");
             }
 
             if (showNumbers) {
@@ -398,6 +412,15 @@ function renderFolderNode(folder) {
 
             liB.appendChild(link);
 
+            // --- Fundstellen hinter dem Link (B1‑b) ---
+            if (dupNums && showDuplicateLocations) {
+                const info = document.createElement("span");
+                info.style.color = "#b00";
+                info.style.marginLeft = "8px";
+                info.textContent = "(Fundstellen: " + dupNums.join(", ") + ")";
+                liB.appendChild(info);
+            }
+
             const urlDiv = document.createElement("div");
             urlDiv.textContent = child.url;
             urlDiv.style.marginLeft = "20px";
@@ -411,10 +434,6 @@ function renderFolderNode(folder) {
         }
     }
 
-    // Ordner ausblenden, wenn:
-    // - Duplikate aktiv sind
-    // - und der Ordner selbst kein Treffer ist
-    // - und er keine sichtbaren Kinder hat
     if (showDuplicatesOnly && !hasVisibleChildren) {
         return null;
     }
@@ -450,6 +469,15 @@ btnShowDuplicates.addEventListener("click", () => {
     btnShowDuplicates.textContent = showDuplicatesOnly
         ? "Alle anzeigen"
         : "Doppelte Links anzeigen";
+    renderTree();
+});
+
+// --- NEU: Fundstellen‑Toggle ---
+btnToggleLocations.addEventListener("click", () => {
+    showDuplicateLocations = !showDuplicateLocations;
+    btnToggleLocations.textContent = showDuplicateLocations
+        ? "Fundstellen ausblenden"
+        : "Fundstellen anzeigen";
     renderTree();
 });
 
