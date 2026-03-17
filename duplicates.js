@@ -1,34 +1,6 @@
 // ------------------------------------------------------------
-// 1) Index aufbauen: absoluteNumber → Bookmark-Objekt
-// ------------------------------------------------------------
-
-window.buildBookmarkIndex = function () {
-    window.bookmarkIndex = {}; // flaches Objekt für schnellen Zugriff
-
-    function walk(folder) {
-        for (const child of folder.children) {
-
-            // Bookmark → in Index eintragen
-            if (child.type === "bookmark") {
-                window.bookmarkIndex[child.absoluteNumber] = child;
-            }
-
-            // Unterordner → rekursiv weiterlaufen
-            if (child.type === "folder") {
-                const sub = window.bookmarkData.folders.find(f => f.id === child.ref);
-                if (sub) walk(sub);
-            }
-        }
-    }
-
-    // Startpunkt: Wurzelordner
-    walk(window.bookmarkData.folders[0]);
-};
-
-
-
-// ------------------------------------------------------------
-// 2) Duplikate finden + 3) Tags zusammenführen
+// duplicates.js
+// Findet Duplikate + führt Tags zusammen (nutzt bookmarkIndex)
 // ------------------------------------------------------------
 
 window.getDuplicateInfo = function () {
@@ -76,8 +48,7 @@ window.getDuplicateInfo = function () {
 
     for (const [url, nums] of map.entries()) {
 
-        // Set verhindert doppelte Tags
-        const collectedTags = new Set();
+        const collectedTags = new Set(); // verhindert doppelte Tags
 
         // Tags einsammeln
         nums.forEach(num => {
@@ -87,7 +58,6 @@ window.getDuplicateInfo = function () {
             }
         });
 
-        // Gemeinsames Tag-Array erzeugen
         const mergedTags = Array.from(collectedTags);
 
         // Allen Bookmarks diese neuen Tags zuweisen
