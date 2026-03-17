@@ -15,7 +15,14 @@ window.parseBookmarkHTML = function (htmlText) {
                 id: folderCounter,
                 title: title || "(Ohne Titel)",
                 children: [],
-                absoluteNumber: null
+                absoluteNumber: null,
+
+                // Checkbox-Eigenschaften
+                showCheckbox: false,
+                selected: false,
+
+                // NEU: Sichtbarkeits-Flag
+                visible: true
             };
             window.bookmarkData.folders.push(folder);
             localCounters[folder.id] = { folderCount: 0, linkCount: 0 };
@@ -111,7 +118,14 @@ window.parseBookmarkHTML = function (htmlText) {
                     title: title,
                     url: href,
                     absoluteNumber: absNum,
-                    tags: [currentFolder.title]
+                    tags: [currentFolder.title],
+
+                    // Checkbox-Eigenschaften
+                    showCheckbox: false,
+                    selected: false,
+
+                    // NEU: Sichtbarkeits-Flag
+                    visible: true
                 });
 
                 continue;

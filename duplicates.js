@@ -17,6 +17,10 @@ window.getDuplicateInfo = function () {
         for (const child of folder.children) {
 
             if (child.type === "bookmark") {
+
+                // ⭐ NEU: Unsichtbare Bookmarks ignorieren
+                if (child.visible === false) continue;
+
                 const url = child.url.trim();
                 const num = child.absoluteNumber;
 

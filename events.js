@@ -1,4 +1,13 @@
+// ---------------------------------------------------------
+// Globale Flags für Checkbox-Modus
+// ---------------------------------------------------------
+window.showUrlCheckboxes = false;
+window.showFolderCheckboxes = false;
+
+
+// ---------------------------------------------------------
 // Datei laden
+// ---------------------------------------------------------
 btnLoad.addEventListener("click", () => fileInput.click());
 
 fileInput.addEventListener("change", function (event) {
@@ -26,14 +35,18 @@ fileInput.addEventListener("change", function (event) {
 });
 
 
+// ---------------------------------------------------------
 // Suche
+// ---------------------------------------------------------
 searchInput.addEventListener("input", () => {
     window.currentSearchTerm = searchInput.value.trim();
     window.renderTree();
 });
 
 
+// ---------------------------------------------------------
 // Nummern ein/aus
+// ---------------------------------------------------------
 btnToggleNumbers.addEventListener("click", () => {
     window.showNumbers = !window.showNumbers;
     btnToggleNumbers.textContent = window.showNumbers ? "Nummern ausblenden" : "Nummern anzeigen";
@@ -41,7 +54,9 @@ btnToggleNumbers.addEventListener("click", () => {
 });
 
 
+// ---------------------------------------------------------
 // URLs ein/aus
+// ---------------------------------------------------------
 btnToggleAllUrls.addEventListener("click", () => {
     window.showAllUrls = !window.showAllUrls;
     btnToggleAllUrls.textContent = window.showAllUrls ? "Alle URLs ausblenden" : "Alle URLs anzeigen";
@@ -49,7 +64,9 @@ btnToggleAllUrls.addEventListener("click", () => {
 });
 
 
+// ---------------------------------------------------------
 // Nur Duplikate anzeigen
+// ---------------------------------------------------------
 btnShowDuplicates.addEventListener("click", () => {
     window.showDuplicatesOnly = !window.showDuplicatesOnly;
     btnShowDuplicates.textContent = window.showDuplicatesOnly
@@ -59,7 +76,9 @@ btnShowDuplicates.addEventListener("click", () => {
 });
 
 
+// ---------------------------------------------------------
 // Fundstellen ein/aus
+// ---------------------------------------------------------
 btnToggleLocations.addEventListener("click", () => {
     window.showDuplicateLocations = !window.showDuplicateLocations;
     btnToggleLocations.textContent = window.showDuplicateLocations
@@ -69,7 +88,9 @@ btnToggleLocations.addEventListener("click", () => {
 });
 
 
-// Export
+// ---------------------------------------------------------
+// Export (noch ohne Filter "nur sichtbare")
+// ---------------------------------------------------------
 btnExport.addEventListener("click", () => {
     if (!window.bookmarkData.folders.length) {
         window.setMessage("Keine Daten zum Exportieren.");
@@ -94,5 +115,102 @@ btnExport.addEventListener("click", () => {
 });
 
 
+// ---------------------------------------------------------
+// Checkboxen für Bookmarks + Ordner ein/aus
+// ---------------------------------------------------------
+btnToggleCheckboxes.addEventListener("click", () => {
+    const newState = !(window.showUrlCheckboxes || window.showFolderCheckboxes);
+
+    window.showUrlCheckboxes = newState;
+    window.showFolderCheckboxes = newState;
+
+    btnToggleCheckboxes.textContent = newState
+        ? "Checkboxen ausblenden"
+        : "Checkboxen anzeigen";
+
+    // Ordner-Checkboxen setzen
+    for (const folder of window.bookmarkData.folders) {
+        folder.showCheckbox = newState;
+    }
+
+    // Bookmark-Checkboxen rekursiv setzen
+    function updateFolder(folder) {
+        for (const child of folder.children) {
+            if (child.type === "bookmark") {
+                child.showCheckbox = newState;
+            }
+            if (child.type === "folder") {
+                const sub = window.bookmarkData.folders.find(f => f.id === child.ref);
+                if (sub) updateFolder(sub);
+            }
+        }
+    }
+
+    for (const folder of window.bookmarkData.folders) {
+        updateFolder(folder);
+    }
+
+    window.renderTree();
+});
+
+
+// ---------------------------------------------------------
+// NEU: Ausgewählte URLs ausblenden (visible = false)
+// ---------------------------------------------------------
+btnHideSelectedUrls.addEventListener("click", () => {
+
+    function walk(folder) {
+        for (const child of folder.children) {
+
+            if (child.type === "bookmark" && child.selected) {
+                child.visible = false;   // URL bleibt erhalten, wird nur versteckt
+            }
+
+            if (child.type === "folder") {
+                const sub = window.bookmarkData.folders.find(f => f.id === child.ref);
+                if (sub) walk(sub);
+            }
+        }
+    }
+
+    for (const folder of window.bookmarkData.folders) {
+        walk(folder);
+    }
+
+    window.renderTree();
+    window.setMessage("Ausgewählte URLs wurden ausgeblendet.");
+});
+
+
+// ---------------------------------------------------------
+// OPTIONAL: Alle ausgeblendeten wieder einblenden
+// ---------------------------------------------------------
+btnShowHiddenUrls.addEventListener("click", () => {
+
+    function walk(folder) {
+        for (const child of folder.children) {
+
+            if (child.type === "bookmark") {
+                child.visible = true;
+            }
+
+            if (child.type === "folder") {
+                const sub = window.bookmarkData.folders.find(f => f.id === child.ref);
+                if (sub) walk(sub);
+            }
+        }
+    }
+
+    for (const folder of window.bookmarkData.folders) {
+        walk(folder);
+    }
+
+    window.renderTree();
+    window.setMessage("Alle ausgeblendeten URLs wurden wieder eingeblendet.");
+});
+
+
+// ---------------------------------------------------------
 // Startmeldung
+// ---------------------------------------------------------
 window.setMessage("Bitte eine Lesezeichen‑Datei laden.");

@@ -6,49 +6,63 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+
     <!-- Oberer Bereich: Menüleiste mit Buttons und Suchfeld -->
     <header id="toolbar">
-        <!-- Button zum Laden einer Lesezeichen-Datei (Edge/Chromium-Export als HTML) -->
+
+        <!-- Button zum Laden einer Lesezeichen-Datei -->
         <button id="btnLoad">Lesezeichen laden</button>
 
         <!-- Button zum Ein-/Ausblenden der Nummerierung -->
         <button id="btnToggleNumbers">Nummern anzeigen</button>
 
-        <!-- Button zum Exportieren/Speichern der aktuellen Lesezeichenstruktur -->
+        <!-- Button zum Exportieren/Speichern -->
         <button id="btnExport">Liste exportieren</button>
 
+        <button id="btnExportHtml">HTML exportieren</button>
+
+        <!-- URLs ein/aus -->
         <button id="btnToggleAllUrls">Alle URLs anzeigen</button>
 
+        <!-- Duplikate -->
         <button id="btnShowDuplicates">Doppelte Links anzeigen</button>
 
+        <!-- Fundstellen -->
         <button id="btnToggleLocations">Fundstellen anzeigen</button>
 
+        <!-- Checkbox-Modus -->
+        <button id="btnToggleCheckboxes">Checkboxen anzeigen</button>
 
+        <!-- NEU: Sichtbarkeits-Buttons -->
+        <button id="btnHideSelectedUrls">Ausgewählte URLs ausblenden</button>
+        <button id="btnShowHiddenUrls">Ausgeblendete URLs einblenden</button>
 
-
-        <!-- Suchfeld: filtert die angezeigten Lesezeichen in Echtzeit -->
+        <!-- Suchfeld -->
         <label for="searchInput">Suche:</label>
         <input type="text" id="searchInput" placeholder="Titel oder URL suchen...">
 
-        <!-- Verstecktes Datei-Eingabefeld, wird über den 'Lesezeichen laden'-Button ausgelöst -->
+        <!-- Verstecktes Datei-Eingabefeld -->
         <input type="file" id="fileInput" accept=".html,.htm,.json" style="display:none;">
     </header>
 
-    <!-- Bereich für Meldungen (Status, Hinweise, Fehler) -->
+    <!-- Bereich für Meldungen -->
     <section id="messageArea"></section>
 
-    <!-- Bereich für die Baumdarstellung der Lesezeichen -->
+    <!-- Bereich für die Baumdarstellung -->
     <main id="treeContainer"></main>
 
+    <!-- JS-Dateien in der richtigen Reihenfolge -->
     <script src="state.js"></script>
-<script src="dom.js"></script>
-<script src="parser-html.js"></script>
-<script src="parser-json.js"></script>
-<script src="bookmark-index.js"></script>
-<script src="duplicates.js"></script>
-<script src="search.js"></script>
-<script src="render.js"></script>
-<script src="events.js"></script>
+    <script src="dom.js"></script>
+    <script src="parser-html.js"></script>
+    <script src="parser-json.js"></script>
+    <script src="bookmark-index.js"></script>
+    <script src="duplicates.js"></script>
+    <script src="search.js"></script>
+    <script src="render.js"></script>
+    <script src="events.js"></script>
+    <script src="export-html.js"></script>
+
 
 </body>
 </html>

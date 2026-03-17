@@ -48,6 +48,20 @@ window.renderFolderNode = function (folder) {
     label.appendChild(document.createTextNode(folder.title));
     li.appendChild(label);
 
+    // Checkbox für Ordner
+    if (folder.showCheckbox) {
+        const cb = document.createElement("input");
+        cb.type = "checkbox";
+        cb.className = "folder-checkbox";
+        cb.checked = folder.selected;
+
+        cb.addEventListener("change", () => {
+            folder.selected = cb.checked;
+        });
+
+        li.appendChild(cb);
+    }
+
     const ul = document.createElement("ul");
     ul.className = "bookmark-tree";
 
@@ -75,11 +89,18 @@ window.renderFolderNode = function (folder) {
             const dupNums = duplicates.get(child.url);
             let visible = true;
 
+            // Filter: nur Duplikate
             if (window.showDuplicatesOnly && !dupNums) {
                 visible = false;
             }
 
+            // Filter: Suche
             if (window.currentSearchTerm && !window.matchesSearch(child)) {
+                visible = false;
+            }
+
+            // Filter: Sichtbarkeits-Flag
+            if (child.visible === false) {
                 visible = false;
             }
 
@@ -93,6 +114,7 @@ window.renderFolderNode = function (folder) {
                 liB.classList.add("duplicate");
             }
 
+            // Nummer
             if (window.showNumbers) {
                 const num = document.createElement("span");
                 num.className = "entry-number";
@@ -100,16 +122,40 @@ window.renderFolderNode = function (folder) {
                 liB.appendChild(num);
             }
 
+            // Link
             const link = document.createElement("a");
-            link.href = child.url;
+
+            // NEU: Link nur aktiv, wenn sichtbar
+            if (child.visible === false) {
+                link.href = "#";
+                link.style.pointerEvents = "none";
+                link.style.opacity = "0.5";
+            } else {
+                link.href = child.url;
+                link.target = "_blank";
+            }
+
             link.textContent = child.title;
-            link.target = "_blank";
 
             if (window.currentSearchTerm && window.matchesSearch(child)) {
                 link.classList.add("highlight");
             }
 
             liB.appendChild(link);
+
+            // Checkbox für Bookmark
+            if (child.showCheckbox) {
+                const cb = document.createElement("input");
+                cb.type = "checkbox";
+                cb.className = "bookmark-checkbox";
+                cb.checked = child.selected;
+
+                cb.addEventListener("change", () => {
+                    child.selected = cb.checked;
+                });
+
+                liB.appendChild(cb);
+            }
 
             // Fundstellen
             if (dupNums && window.showDuplicateLocations) {
@@ -162,7 +208,12 @@ window.renderFolderNode = function (folder) {
             urlDiv.style.marginLeft = "20px";
             urlDiv.style.fontSize = "0.9em";
             urlDiv.style.color = "#444";
-            urlDiv.style.display = window.showAllUrls ? "block" : "none";
+
+            // NEU: URL nur anzeigen, wenn sichtbar
+            urlDiv.style.display =
+                (window.showAllUrls && child.visible !== false)
+                    ? "block"
+                    : "none";
 
             liB.appendChild(urlDiv);
 
