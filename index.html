@@ -12,6 +12,8 @@
 
         <!-- Button zum Laden einer Lesezeichen-Datei -->
         <button id="btnLoad">Lesezeichen laden</button>
+        <button id="btnLoadHtml">HTML laden</button>
+
 
         <!-- Button zum Ein-/Ausblenden der Nummerierung -->
         <button id="btnToggleNumbers">Nummern anzeigen</button>
@@ -41,8 +43,11 @@
         <label for="searchInput">Suche:</label>
         <input type="text" id="searchInput" placeholder="Titel oder URL suchen...">
 
+
         <!-- Verstecktes Datei-Eingabefeld -->
         <input type="file" id="fileInput" accept=".html,.htm,.json" style="display:none;">
+        <input type="file" id="fileInputHtml" accept=".html,.htm" style="display:none;">
+
     </header>
 
     <!-- Bereich für Meldungen -->
@@ -62,6 +67,8 @@
     <script src="render.js"></script>
     <script src="events.js"></script>
     <script src="export-html.js"></script>
+    <script src="import-html.js"></script>
+
 
 
 </body>
