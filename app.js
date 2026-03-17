@@ -1,5 +1,6 @@
 // ============================================================
-// Lesezeichen‑Organizer – Version mit zeilenweisem Parsing
+// Lesezeichen‑Organizer – Parsing, Nummerierung, Suche,
+// globale URL‑Anzeige + DUPLIKAT-ANZEIGE
 // ============================================================
 
 
@@ -7,11 +8,10 @@
 // Globale Variablen
 // -----------------------------
 
-let bookmarkData = {
-    folders: []
-};
-
+let bookmarkData = { folders: [] };
 let showNumbers = false;
+let showAllUrls = false;
+let showDuplicatesOnly = false;   // <--- NEU
 let currentSearchTerm = "";
 
 
@@ -21,6 +21,8 @@ let currentSearchTerm = "";
 
 const btnLoad = document.getElementById("btnLoad");
 const btnToggleNumbers = document.getElementById("btnToggleNumbers");
+const btnToggleAllUrls = document.getElementById("btnToggleAllUrls");
+const btnShowDuplicates = document.getElementById("btnShowDuplicates"); // <--- NEU
 const btnExport = document.getElementById("btnExport");
 const fileInput = document.getElementById("fileInput");
 const messageArea = document.getElementById("messageArea");
@@ -132,7 +134,6 @@ function parseBookmarkHTML(htmlText) {
                 const title = extractH3Title(line) || "(Ohne Titel)";
                 const newFolder = createFolder(title);
 
-                // Wenn wir schon in einem Ordner sind → Kind hinzufügen
                 if (folderStack.length > 0) {
                     const parentId = folderStack[folderStack.length - 1];
                     const parentFolder = bookmarkData.folders.find(f => f.id === parentId);
@@ -142,14 +143,12 @@ function parseBookmarkHTML(htmlText) {
                     });
                 }
 
-                // Dies ist jetzt der aktuelle Ordner
                 folderStack.push(newFolder.id);
                 continue;
             }
 
             // --- Lesezeichen ---
             if (upper.includes("<DT><A") || upper.includes("<A ")) {
-                // Falls ein Link vor dem ersten Ordner kommt → eigenen Ordner erzeugen
                 if (folderStack.length === 0) {
                     const autoFolder = createFolder("Allgemein");
                     folderStack.push(autoFolder.id);
@@ -219,6 +218,63 @@ function parseBookmarkJSON(jsonText) {
 
 
 // -----------------------------
+// DUPLIKATE FINDEN
+// -----------------------------
+
+function getDuplicateUrls() {
+    const urlCount = {};
+
+    function walk(folder) {
+        for (const child of folder.children) {
+            if (child.type === "bookmark") {
+                const url = child.url.trim();
+                urlCount[url] = (urlCount[url] || 0) + 1;
+            }
+            if (child.type === "folder") {
+                const sub = bookmarkData.folders.find(f => f.id === child.ref);
+                if (sub) walk(sub);
+            }
+        }
+    }
+
+    walk(bookmarkData.folders[0]);
+
+    const duplicates = new Set(
+        Object.keys(urlCount).filter(url => urlCount[url] > 1)
+    );
+
+    return duplicates;
+}
+
+
+// -----------------------------
+// Suche in Ordnern
+// -----------------------------
+
+function matchesFolder(folder) {
+    if (!currentSearchTerm) return true;
+
+    const term = currentSearchTerm.toLowerCase();
+    return (folder.title || "").toLowerCase().includes(term);
+}
+
+
+// -----------------------------
+// Suche in Lesezeichen
+// -----------------------------
+
+function matchesSearch(bookmark) {
+    if (!currentSearchTerm) return true;
+
+    const term = currentSearchTerm.toLowerCase();
+    return (
+        (bookmark.title || "").toLowerCase().includes(term) ||
+        (bookmark.url || "").toLowerCase().includes(term)
+    );
+}
+
+
+// -----------------------------
 // Baumdarstellung
 // -----------------------------
 
@@ -230,13 +286,12 @@ function renderTree() {
         return;
     }
 
-    // Der erste Ordner ist jetzt die echte Wurzel
     const rootFolder = bookmarkData.folders[0];
 
     const ul = document.createElement("ul");
     ul.className = "bookmark-tree";
 
-    const rootLi = renderFolderNode(rootFolder);
+    const rootLi = renderFolderNode(rootFolder, "1");
 
     if (rootLi) {
         ul.appendChild(rootLi);
@@ -251,7 +306,10 @@ function renderTree() {
 /**
  * Rendert einen Ordner rekursiv.
  */
-function renderFolderNode(folder) {
+function renderFolderNode(folder, numberPrefix) {
+    const folderMatches = matchesFolder(folder);
+    const duplicates = getDuplicateUrls();
+
     const li = document.createElement("li");
 
     const label = document.createElement("span");
@@ -260,8 +318,12 @@ function renderFolderNode(folder) {
     if (showNumbers) {
         const num = document.createElement("span");
         num.className = "entry-number";
-        num.textContent = `[${folder.id}] `;
+        num.textContent = numberPrefix + " ";
         label.appendChild(num);
+    }
+
+    if (folderMatches && currentSearchTerm) {
+        label.classList.add("highlight");
     }
 
     label.appendChild(document.createTextNode(folder.title));
@@ -271,6 +333,8 @@ function renderFolderNode(folder) {
     ul.className = "bookmark-tree";
 
     let hasVisibleChildren = false;
+    let folderChildCounter = 0;
+    let bookmarkCounter = 0;
 
     for (const child of folder.children) {
 
@@ -278,7 +342,11 @@ function renderFolderNode(folder) {
         if (child.type === "folder") {
             const subFolder = bookmarkData.folders.find(f => f.id === child.ref);
             if (subFolder) {
-                const subLi = renderFolderNode(subFolder);
+                folderChildCounter++;
+
+                const newPrefix = numberPrefix + "." + folderChildCounter;
+
+                const subLi = renderFolderNode(subFolder, newPrefix);
                 if (subLi) {
                     ul.appendChild(subLi);
                     hasVisibleChildren = true;
@@ -288,7 +356,16 @@ function renderFolderNode(folder) {
 
         // --- Lesezeichen ---
         else if (child.type === "bookmark") {
+
+            // Filter: nur Duplikate anzeigen?
+            if (showDuplicatesOnly && !duplicates.has(child.url)) {
+                continue;
+            }
+
+            // Filter: Suchbegriff
             if (currentSearchTerm && !matchesSearch(child)) continue;
+
+            bookmarkCounter++;
 
             const liB = document.createElement("li");
             liB.className = "bookmark-item";
@@ -296,7 +373,7 @@ function renderFolderNode(folder) {
             if (showNumbers) {
                 const num = document.createElement("span");
                 num.className = "entry-number";
-                num.textContent = `[${folder.id}/${child.index}] `;
+                num.textContent = numberPrefix + "." + bookmarkCounter + " ";
                 liB.appendChild(num);
             }
 
@@ -310,12 +387,25 @@ function renderFolderNode(folder) {
             }
 
             liB.appendChild(link);
+
+            // URL‑Anzeige (global)
+            const urlDiv = document.createElement("div");
+            urlDiv.textContent = child.url;
+            urlDiv.style.marginLeft = "20px";
+            urlDiv.style.fontSize = "0.9em";
+            urlDiv.style.color = "#444";
+            urlDiv.style.display = showAllUrls ? "block" : "none";
+
+            liB.appendChild(urlDiv);
+
             ul.appendChild(liB);
             hasVisibleChildren = true;
         }
     }
 
-    if (currentSearchTerm && !hasVisibleChildren) return null;
+    if (currentSearchTerm && !hasVisibleChildren && !folderMatches) {
+        return null;
+    }
 
     li.appendChild(ul);
     return li;
@@ -323,18 +413,8 @@ function renderFolderNode(folder) {
 
 
 // -----------------------------
-// Suche
+// Sucheingabe
 // -----------------------------
-
-function matchesSearch(bookmark) {
-    if (!currentSearchTerm) return true;
-
-    const term = currentSearchTerm.toLowerCase();
-    return (
-        (bookmark.title || "").toLowerCase().includes(term) ||
-        (bookmark.url || "").toLowerCase().includes(term)
-    );
-}
 
 searchInput.addEventListener("input", () => {
     currentSearchTerm = searchInput.value.trim();
@@ -349,6 +429,31 @@ searchInput.addEventListener("input", () => {
 btnToggleNumbers.addEventListener("click", () => {
     showNumbers = !showNumbers;
     btnToggleNumbers.textContent = showNumbers ? "Nummern ausblenden" : "Nummern anzeigen";
+    renderTree();
+});
+
+
+// -----------------------------
+// ALLE URLs ein-/ausblenden
+// -----------------------------
+
+btnToggleAllUrls.addEventListener("click", () => {
+    showAllUrls = !showAllUrls;
+    btnToggleAllUrls.textContent = showAllUrls ? "Alle URLs ausblenden" : "Alle URLs anzeigen";
+    renderTree();
+});
+
+
+// -----------------------------
+// DUPLIKATE anzeigen
+// -----------------------------
+
+btnShowDuplicates.addEventListener("click", () => {
+    showDuplicatesOnly = !showDuplicatesOnly;
+    btnShowDuplicates.textContent = showDuplicatesOnly
+        ? "Alle anzeigen"
+        : "Doppelte Links anzeigen";
+
     renderTree();
 });
 
